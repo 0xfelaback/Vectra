@@ -9,6 +9,8 @@ namespace Vectra.Core.Entities
     public class MatchResult
     {
         public Guid Id { get; set; }
+        public Guid InternalTransactionId { get; set; }
+        public Guid ExternalTransactionId { get; set; }
         public string InternalTransactionReference { get; set; } = string.Empty;
         public string ExternalTransactionReference { get; set; } = string.Empty;
         [Range(0.0, 1.0, ErrorMessage = "ConfidenceScore must be between 0.0 and 1.0.")]
@@ -31,7 +33,7 @@ namespace Vectra.Core.Entities
         public enum MatchStatus
         {
             Confirmed = 1,
-            Probable,
+            ProbableMatch,
             Possible,
             Unmatched,
             Duplicate,
@@ -41,7 +43,25 @@ namespace Vectra.Core.Entities
 
         public enum MatchStrategy
         {
-            ExactMatch = 1, ReferenceAnchoredFuzzymatch, AmountDateFuzzyMatch, PartialAmountMatch, RuleBasedMatch
+            /// <summary>
+            /// CORE-MS-002: Exact Reference and Amount Matching Strategy.
+            /// </summary>
+            ExactReferenceAndAmount = 1,
+
+            /// <summary>
+            /// CORE-MS-003: Exact Amount with Date Proximity Window Strategy.
+            /// </summary>
+            AmountAndDateProximity = 2,
+
+            /// <summary>
+            /// CORE-MS-004: Weighted Multi-Factor Text and Value Fuzzy Matching Strategy.
+            /// </summary>
+            MultiFactorFuzzy = 3,
+
+            /// <summary>
+            /// For overrides where an operator or AI agent manually links un-matched records.
+            /// </summary>
+            ManualOverride = 4
         }
     }
 }

@@ -1,5 +1,4 @@
-using System.Transactions;
-
+using Vectra.Core.Entities;
 namespace Vectra.Core.Interfaces
 {
     public interface IReconciliationEngine

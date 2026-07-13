@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Vectra.Core.Entities;
 
@@ -7,10 +6,6 @@ namespace Vectra.Core.Services
 
     public sealed class DataNormalizer
     {
-        /*
-        builder.Services.AddSingleton<DataNormalizer>(sp => 
-        new DataNormalizer(abbreviations, fillerWords));
-        */
         private string DEFAULT_TIMEZONE = "W. Central Africa Standard Time";
         private readonly Dictionary<string, string> _abbreviationDictionary;
         private readonly HashSet<string> _fillerWordsTextSet;
@@ -24,6 +19,18 @@ namespace Vectra.Core.Services
             _fillerWordsTextSet = fillerWords != null
                 ? new HashSet<string>(fillerWords, StringComparer.OrdinalIgnoreCase)
                 : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+        public (List<Transaction> CleanRecords, List<ReconciliationException> Exceptions) ExecuteNormalization(List<Transaction> transactions, Guid jobId)
+        {
+
+            foreach (var item in transactions)
+            {
+                NormaizeAmount(item);
+                TimezoneNormalization(item);
+                DescriptionNormalization(item);
+                ReferenceCodeNormalization(item);
+            }
+            return DuplicatePreScreening(transactions, jobId);
         }
         private void NormaizeAmount(Transaction transaction)
         {
@@ -61,7 +68,7 @@ namespace Vectra.Core.Services
         }
         private void DescriptionNormalization(Transaction transaction)
         {
-            if (string.IsNullOrWhiteSpace(transaction.RawDescription) || transaction == null) return;
+            if (transaction == null || string.IsNullOrWhiteSpace(transaction.RawDescription)) return;
             string text = transaction.RawDescription.ToLowerInvariant();
             text = Regex.Replace(text, @"[^a-z\s]", "");
             text = Regex.Replace(text, @"\s+", " ").Trim();
@@ -95,9 +102,23 @@ namespace Vectra.Core.Services
 
         }
 
-        private (List<Transaction> CleanRecords, List<ReconciliationException> Exceptions) DuplicatePreScreening(List<Transaction> transactions, Guid JobId)
+        private void ReferenceCodeNormalization(Transaction transaction)
         {
-            if (transactions == null || transactions.Count <= 1) return (new List<Transaction>(), new List<ReconciliationException>());
+            if (transaction is null) return;
+
+            if (string.IsNullOrEmpty(transaction.ReferenceCode) || string.IsNullOrWhiteSpace(transaction.ReferenceCode))
+            {
+                transaction.ReferenceCode = null;
+                return;
+            }
+            transaction.ReferenceCode = transaction.ReferenceCode.ToUpperInvariant();
+            transaction.ReferenceCode = transaction.ReferenceCode.Trim();
+        }
+
+        private (List<Transaction> CleanRecords, List<ReconciliationException> Exceptions) DuplicatePreScreening(List<Transaction> transactions, Guid jobId)
+        {
+            if (transactions == null) return (new List<Transaction>(), new List<ReconciliationException>());
+            if (transactions.Count <= 1) return (transactions, new List<ReconciliationException>());
             List<Transaction> cleanRecords = new();
             List<ReconciliationException> exceptions = new();
 
@@ -114,7 +135,7 @@ namespace Vectra.Core.Services
                     exceptions.Add(new ReconciliationException
                     {
                         Type = ReconciliationException.ReconciliationExceptionType.DuplicateDetected,
-                        JobId = JobId,
+                        JobId = jobId,
                         AffectedTransactionIds = transactionsGroup.Select(t => t.Id).ToList(),
                         Description = "Multiple identical transactions detected for the same amount, date, and normalized description.",
                     });
@@ -124,8 +145,5 @@ namespace Vectra.Core.Services
 
             return (cleanRecords, exceptions);
         }
-
     }
-
-
 }
